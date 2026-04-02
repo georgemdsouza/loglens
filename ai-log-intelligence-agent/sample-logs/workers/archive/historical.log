@@ -1,0 +1,3 @@
+2026-03-28 08:01:01 INFO archive parse start
+2026-03-28 08:03:00 ERROR archive parser failed section=payments
+2026-03-28 08:03:22 INFO archive parser retry success section=payments

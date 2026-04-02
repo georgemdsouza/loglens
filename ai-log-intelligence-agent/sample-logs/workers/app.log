@@ -1,0 +1,5 @@
+2026-03-31 14:22:11 INFO worker-1 boot complete request_id=abc-123
+2026-03-31 14:22:13 ERROR worker-1 timeout contacting upstream request_id=abc-123
+2026-03-31T14:23:01 WARN worker-2 retrying task request_id=def-777
+[31/Mar/2026:14:25:21] INFO worker-3 task completed request_id=ghi-222
+Mar 31 14:27:11 ERROR worker-3 database connection lost request_id=ghi-222

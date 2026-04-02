@@ -1,0 +1,36 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      LOG_MOUNT_PATH: /data/logs
+      FRONTEND_ORIGIN: http://localhost:5173
+    volumes:
+      - ./backend/app:/app/app
+      - ${LOG_FOLDER:?Set LOG_FOLDER in .env}:/data/logs:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_BASE_URL: /api
+      VITE_BACKEND_INTERNAL_URL: http://backend:8000
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/index.html:/app/index.html
+      - ./frontend/vite.config.ts:/app/vite.config.ts
+      - ./frontend/public:/app/public
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy

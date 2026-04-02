@@ -360,19 +360,6 @@ function App() {
               </section>
 
               <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <h2 className="mb-3 text-base font-semibold text-slate-900">Top Repeated Patterns</h2>
-                <ul className="space-y-1 text-sm">
-                  {results.summary.top_patterns.length === 0 && <li className="text-slate-500">No repeated patterns yet.</li>}
-                  {results.summary.top_patterns.map(([pattern, count]) => (
-                    <li key={`${pattern}-${count}`} className="flex items-start justify-between gap-4 rounded-lg border border-slate-100 px-3 py-2">
-                      <span className="line-clamp-1 text-slate-700">{pattern}</span>
-                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">{count}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                   <h2 className="text-base font-semibold text-slate-900">Matching Lines</h2>
                   <div className="text-xs text-slate-500">
@@ -394,18 +381,15 @@ function App() {
                   <table className="min-w-full text-left text-sm">
                     <thead className="sticky top-0 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                       <tr>
+                        <th className="px-3 py-2">Message</th>
+                        <th className="px-3 py-2">Timestamp</th>
                         <th className="px-3 py-2">File</th>
                         <th className="px-3 py-2">Line</th>
-                        <th className="px-3 py-2">Timestamp</th>
-                        <th className="px-3 py-2">Message</th>
                       </tr>
                     </thead>
                     <tbody>
                       {paginatedMatches.map((row) => (
                         <tr key={`${row.file_path}-${row.line_number}`} className="border-t border-slate-100 align-top hover:bg-slate-50/70">
-                          <td className="max-w-[300px] truncate px-3 py-2 text-xs text-slate-600" title={row.file_path}>{row.file_path}</td>
-                          <td className="px-3 py-2 text-slate-700">{row.line_number}</td>
-                          <td className="px-3 py-2 text-slate-700">{row.timestamp || '-'}</td>
                           <td className="px-3 py-2 font-mono text-xs text-slate-800">
                             {row.context_before.length > 0 && (
                               <div className="mb-1 rounded bg-slate-50 p-2 text-slate-600">
@@ -432,6 +416,9 @@ function App() {
                               </div>
                             )}
                           </td>
+                          <td className="px-3 py-2 text-slate-700">{row.timestamp || '-'}</td>
+                          <td className="max-w-[300px] truncate px-3 py-2 text-xs text-slate-600" title={row.file_path}>{row.file_path}</td>
+                          <td className="px-3 py-2 text-slate-700">{row.line_number}</td>
                         </tr>
                       ))}
                       {paginatedMatches.length === 0 && (

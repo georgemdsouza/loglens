@@ -1,4 +1,4 @@
-# ai-log-intelligence-agent
+# Log Intelligence scanner
 
 Docker-first, local-first log analysis app for very large files.
 

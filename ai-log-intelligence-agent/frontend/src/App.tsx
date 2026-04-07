@@ -35,6 +35,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const PAGE_SIZE = 50
 
 function App() {
+  const [subfolder, setSubfolder] = useState('')
   const [scanConfig, setScanConfig] = useState<ScanConfig | null>(null)
   const [configLoading, setConfigLoading] = useState(true)
 
@@ -112,7 +113,7 @@ function App() {
     const cleanedTerms = terms.map((t) => t.trim()).filter(Boolean)
 
     return {
-      subfolder: '',
+      subfolder: subfolder.trim(),
       include_extensions: includeExtensions,
       date_range: start || end ? { start, end } : null,
       context_lines: contextLines,
@@ -219,6 +220,15 @@ function App() {
             <form onSubmit={onSearch} className="space-y-4">
               <Field label="Mounted Scan Root (read-only)">
                 <input className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm" value={scanConfig?.scan_root ?? '/data/logs'} readOnly />
+              </Field>
+
+              <Field label="Subfolder (optional, relative)">
+                <input
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                  value={subfolder}
+                  onChange={(e) => setSubfolder(e.target.value)}
+                  placeholder="GT/ or UK/01"
+                />
               </Field>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

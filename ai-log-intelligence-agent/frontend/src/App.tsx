@@ -356,13 +356,13 @@ function App() {
   const mountStatusTone = scanConfig?.exists && scanConfig?.readable ? 'text-emerald-700' : 'text-amber-700'
 
   return (
-    <main className="min-h-screen w-full px-4 py-8 sm:px-6 lg:px-8">
-      <header className="mb-6 rounded-2xl border border-slate-200 bg-white/85 p-6 shadow-sm backdrop-blur">
-        <p className="mb-2 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 ring-1 ring-blue-200">
+    <main className="min-h-screen w-full px-4 py-5 sm:px-6 lg:px-8">
+      <header className="mb-4 rounded-xl border border-slate-200 bg-white/85 p-3 shadow-sm backdrop-blur">
+        <p className="mb-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-blue-200">
           Docker-first log analytics
         </p>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">LogLens</h1>
-        <p className="mt-2 text-sm text-slate-600">Search huge logs safely with streaming scans, date filters, regex, and export.</p>
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">LogLens</h1>
+        <p className="mt-1 text-xs text-slate-600">Search huge logs safely with streaming scans, date filters, regex, and export.</p>
       </header>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-12">

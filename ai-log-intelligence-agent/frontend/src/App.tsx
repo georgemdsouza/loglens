@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { ReactNode } from 'react'
 
@@ -31,6 +31,19 @@ type ScanConfig = {
   total_files_under_root: number
 }
 
+type ScanStatus = {
+  search_id: string
+  status: 'running' | 'completed' | 'failed' | 'cancelled' | 'not_found'
+  started_at: string | null
+  updated_at: string | null
+  current_file: string | null
+  total_files: number
+  files_scanned: number
+  lines_scanned: number
+  matches_found: number
+  message: string
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const PAGE_SIZE = 50
 
@@ -52,11 +65,36 @@ function App() {
   const [includeLog, setIncludeLog] = useState(true)
   const [includeTxt, setIncludeTxt] = useState(true)
   const [includeGz, setIncludeGz] = useState(true)
+  const [includeNoExt, setIncludeNoExt] = useState(true)
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [results, setResults] = useState<SearchResponse | null>(null)
+  const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null)
+  const [activeSearchId, setActiveSearchId] = useState<string | null>(null)
+  const searchAbortRef = useRef<AbortController | null>(null)
   const [page, setPage] = useState(1)
+  useEffect(() => {
+    if (!loading || !activeSearchId) {
+      return
+    }
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/search-status?search_id=${encodeURIComponent(activeSearchId)}`)
+        if (!response.ok) return
+        const data: ScanStatus = await response.json()
+        setScanStatus(data)
+      } catch {
+        // best-effort polling; do not block user workflow
+      }
+    }
+
+    void poll()
+    const id = window.setInterval(() => void poll(), 1000)
+    return () => window.clearInterval(id)
+  }, [loading, activeSearchId])
+
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -97,8 +135,9 @@ function App() {
     if (includeLog) ext.push('.log')
     if (includeTxt) ext.push('.txt')
     if (includeGz) ext.push('.gz')
+    if (includeNoExt) ext.push('[none]')
     return ext
-  }, [includeLog, includeTxt, includeGz])
+  }, [includeLog, includeTxt, includeGz, includeNoExt])
 
   const toDateTime = (dateValue: string, timeValue: string): string | null => {
     if (!dateValue) return null
@@ -111,8 +150,10 @@ function App() {
     const start = toDateTime(startDate, startTime)
     const end = toDateTime(endDate, endTime || '23:59:59')
     const cleanedTerms = terms.map((t) => t.trim()).filter(Boolean)
+    const searchId = activeSearchId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 
     return {
+      search_id: searchId,
       subfolder: subfolder.trim(),
       include_extensions: includeExtensions,
       date_range: start || end ? { start, end } : null,
@@ -132,6 +173,20 @@ function App() {
     setLoading(true)
     setError(null)
     setPage(1)
+    const searchId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    setActiveSearchId(searchId)
+    setScanStatus({
+      search_id: searchId,
+      status: 'running',
+      started_at: null,
+      updated_at: null,
+      current_file: null,
+      total_files: 0,
+      files_scanned: 0,
+      lines_scanned: 0,
+      matches_found: 0,
+      message: 'Preparing scan...',
+    })
 
     try {
       if (includeExtensions.length === 0) {
@@ -140,13 +195,17 @@ function App() {
 
       const payload = {
         ...buildPayload(),
+        search_id: searchId,
         max_results: 2000,
       }
+      const abortController = new AbortController()
+      searchAbortRef.current = abortController
 
       const response = await fetch(`${API_BASE}/search`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
+        signal: abortController.signal,
       })
 
       if (!response.ok) {
@@ -156,15 +215,64 @@ function App() {
 
       const data: SearchResponse = await response.json()
       setResults(data)
+      setScanStatus((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'completed',
+              files_scanned: data.summary.total_files_scanned,
+              lines_scanned: data.summary.total_lines_scanned,
+              matches_found: data.summary.total_matches,
+              message: 'Scan completed',
+            }
+          : prev
+      )
       if (data.summary.total_files_scanned === 0) {
         setError('No matching files found under mounted root/subfolder for selected extensions.')
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setScanStatus((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: 'cancelled',
+                message: 'Scan cancelled',
+              }
+            : prev
+        )
+        return
+      }
       setResults(null)
       setError(err instanceof Error ? err.message : 'Unknown error')
     } finally {
+      searchAbortRef.current = null
       setLoading(false)
     }
+  }
+
+  const onCancelScan = async () => {
+    if (!activeSearchId) {
+      return
+    }
+    try {
+      await fetch(`${API_BASE}/search-cancel?search_id=${encodeURIComponent(activeSearchId)}`, {
+        method: 'POST',
+      })
+    } catch {
+      // best effort
+    }
+    searchAbortRef.current?.abort()
+    setLoading(false)
+    setScanStatus((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: 'cancelled',
+            message: 'Cancel requested',
+          }
+        : prev
+    )
   }
 
   const onExport = async (format: 'json' | 'csv') => {
@@ -323,11 +431,20 @@ function App() {
                 <label className="inline-flex items-center gap-1"><input type="checkbox" checked={includeLog} onChange={(e) => setIncludeLog(e.target.checked)} /> .log</label>
                 <label className="inline-flex items-center gap-1"><input type="checkbox" checked={includeTxt} onChange={(e) => setIncludeTxt(e.target.checked)} /> .txt</label>
                 <label className="inline-flex items-center gap-1"><input type="checkbox" checked={includeGz} onChange={(e) => setIncludeGz(e.target.checked)} /> .gz</label>
+                <label className="inline-flex items-center gap-1"><input type="checkbox" checked={includeNoExt} onChange={(e) => setIncludeNoExt(e.target.checked)} /> no extension</label>
               </div>
 
               <div className="flex flex-wrap items-center gap-3 pt-1">
                 <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50" disabled={loading || configLoading}>
                   {loading ? 'Scanning...' : 'Search'}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-lg border border-rose-300 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+                  disabled={!loading}
+                  onClick={onCancelScan}
+                >
+                  Cancel Scan
                 </button>
                 <button type="button" className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50" onClick={() => onExport('json')}>
                   Export JSON
@@ -359,6 +476,25 @@ function App() {
 
         <section className="space-y-6 lg:col-span-8">
           {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+          {scanStatus && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-slate-900">Scanner Status</h2>
+                <span className="text-xs text-slate-500">{scanStatus.status}</span>
+              </div>
+              <p className="text-sm text-slate-700">{scanStatus.message || 'Scanning...'}</p>
+              <p className="mt-1 text-xs text-slate-500 truncate" title={scanStatus.current_file || ''}>
+                Current file: {scanStatus.current_file || '-'}
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600 md:grid-cols-4">
+                <div>Files: <strong>{scanStatus.files_scanned}/{scanStatus.total_files}</strong></div>
+                <div>Lines: <strong>{scanStatus.lines_scanned.toLocaleString()}</strong></div>
+                <div>Matches: <strong>{scanStatus.matches_found.toLocaleString()}</strong></div>
+                <div>ID: <strong>{scanStatus.search_id}</strong></div>
+              </div>
+            </section>
+          )}
 
           {results ? (
             <>

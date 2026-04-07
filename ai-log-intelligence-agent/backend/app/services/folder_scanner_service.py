@@ -7,7 +7,16 @@ from app.core.config import get_scan_root
 
 
 def _normalize_extensions(include_extensions: list[str]) -> set[str]:
-    return {ext.lower() if ext.startswith(".") else f".{ext.lower()}" for ext in include_extensions}
+    normalized: set[str] = set()
+    for ext in include_extensions:
+        cleaned = ext.strip().lower()
+        if not cleaned:
+            continue
+        if cleaned in {"[none]", "none", "noext", "no-extension", "no_extension"}:
+            normalized.add("[none]")
+            continue
+        normalized.add(cleaned if cleaned.startswith(".") else f".{cleaned}")
+    return normalized
 
 
 def resolve_scan_folder(subfolder: str) -> Path:
@@ -38,7 +47,16 @@ def resolve_scan_folder(subfolder: str) -> Path:
 def scan_log_files(subfolder: str, include_extensions: list[str]) -> list[Path]:
     target = resolve_scan_folder(subfolder)
     normalized_ext = _normalize_extensions(include_extensions)
-    files = [p for p in target.rglob("*") if p.is_file() and p.suffix.lower() in normalized_ext]
+    include_no_extension = "[none]" in normalized_ext
+    files = [
+        p
+        for p in target.rglob("*")
+        if p.is_file()
+        and (
+            p.suffix.lower() in normalized_ext
+            or (include_no_extension and p.suffix == "")
+        )
+    ]
     if not files:
         scan_target = subfolder.strip() or "."
         raise ValueError(

@@ -31,6 +31,7 @@ class ScanRequest(BaseModel):
 
 
 class SearchRequest(ScanRequest):
+    search_id: str | None = None
     date_range: DateRange | None = None
     filters: SearchFilters = Field(default_factory=SearchFilters)
     context_lines: int = Field(default=0, ge=0, le=50)
@@ -83,3 +84,16 @@ class ScanRootConfigResponse(BaseModel):
     exists: bool
     readable: bool
     total_files_under_root: int = 0
+
+
+class ScanProgressResponse(BaseModel):
+    search_id: str
+    status: Literal["running", "completed", "failed", "cancelled", "not_found"]
+    started_at: str | None = None
+    updated_at: str | None = None
+    current_file: str | None = None
+    total_files: int = 0
+    files_scanned: int = 0
+    lines_scanned: int = 0
+    matches_found: int = 0
+    message: str = ""

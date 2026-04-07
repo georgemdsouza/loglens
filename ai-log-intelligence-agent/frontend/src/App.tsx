@@ -44,6 +44,11 @@ type ScanStatus = {
   message: string
 }
 
+type ScanFileResponse = {
+  total_files: number
+  files: { path: string; relative_path: string }[]
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api'
 const PAGE_SIZE = 50
 
@@ -74,6 +79,10 @@ function App() {
   const [activeSearchId, setActiveSearchId] = useState<string | null>(null)
   const searchAbortRef = useRef<AbortController | null>(null)
   const [page, setPage] = useState(1)
+  const [availableFiles, setAvailableFiles] = useState<string[]>([])
+  const [allFilesSelected, setAllFilesSelected] = useState(true)
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
+  const [filesLoading, setFilesLoading] = useState(false)
   useEffect(() => {
     if (!loading || !activeSearchId) {
       return
@@ -156,6 +165,7 @@ function App() {
       search_id: searchId,
       subfolder: subfolder.trim(),
       include_extensions: includeExtensions,
+      selected_files: allFilesSelected ? [] : selectedFiles,
       date_range: start || end ? { start, end } : null,
       context_lines: contextLines,
       filters: {
@@ -165,6 +175,38 @@ function App() {
         regex_mode: regexMode,
         case_insensitive: caseInsensitive,
       },
+    }
+  }
+
+  const loadFiles = async () => {
+    setFilesLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${API_BASE}/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subfolder: subfolder.trim(),
+          include_extensions: includeExtensions,
+          selected_files: [],
+        }),
+      })
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({ detail: 'Unable to load files' }))
+        throw new Error(body.detail || 'Unable to load files')
+      }
+      const data: ScanFileResponse = await response.json()
+      const rel = data.files.map((f) => f.relative_path)
+      setAvailableFiles(rel)
+      if (!allFilesSelected) {
+        setSelectedFiles((prev) => prev.filter((f) => rel.includes(f)))
+      }
+    } catch (err) {
+      setAvailableFiles([])
+      setSelectedFiles([])
+      setError(err instanceof Error ? err.message : 'Unable to load files')
+    } finally {
+      setFilesLoading(false)
     }
   }
 
@@ -191,6 +233,9 @@ function App() {
     try {
       if (includeExtensions.length === 0) {
         throw new Error('Select at least one file type')
+      }
+      if (!allFilesSelected && selectedFiles.length === 0) {
+        throw new Error('Select at least one file or choose ALL files')
       }
 
       const payload = {
@@ -338,6 +383,53 @@ function App() {
                   placeholder="GT/ or UK/01"
                 />
               </Field>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Target files</p>
+                  <button
+                    type="button"
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                    onClick={loadFiles}
+                    disabled={filesLoading}
+                  >
+                    {filesLoading ? 'Loading...' : 'Load files'}
+                  </button>
+                </div>
+                <label className="mb-2 inline-flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={allFilesSelected}
+                    onChange={(e) => {
+                      setAllFilesSelected(e.target.checked)
+                      if (e.target.checked) {
+                        setSelectedFiles([])
+                      }
+                    }}
+                  />
+                  ALL files
+                </label>
+                {!allFilesSelected && (
+                  <div className="max-h-40 space-y-1 overflow-auto rounded border border-slate-200 bg-white p-2 text-xs">
+                    {availableFiles.length === 0 && (
+                      <p className="text-slate-500">Click \"Load files\" to fetch available files.</p>
+                    )}
+                    {availableFiles.map((file) => (
+                      <label key={file} className="flex items-center gap-2 truncate">
+                        <input
+                          type="checkbox"
+                          checked={selectedFiles.includes(file)}
+                          onChange={(e) =>
+                            setSelectedFiles((prev) =>
+                              e.target.checked ? [...prev, file] : prev.filter((f) => f !== file)
+                            )
+                          }
+                        />
+                        <span className="truncate" title={file}>{file}</span>
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field label="Start Date">

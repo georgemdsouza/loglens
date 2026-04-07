@@ -13,7 +13,7 @@ from app.models.schemas import (
     SearchResponse,
 )
 from app.services.export_service import export_results
-from app.services.folder_scanner_service import scan_log_files, scan_root_metadata
+from app.services.folder_scanner_service import resolve_scan_folder, scan_log_files, scan_root_metadata
 from app.services.progress_service import get_progress, request_cancel
 from app.services.search_service import SearchCancelledError, search_logs
 
@@ -33,8 +33,15 @@ def config() -> ScanRootConfigResponse:
 @router.post("/scan")
 def scan(payload: ScanRequest):
     try:
-        files = scan_log_files(payload.subfolder, payload.include_extensions)
-        return {"total_files": len(files), "files": [str(p) for p in files[:500]]}
+        files = scan_log_files(payload.subfolder, payload.include_extensions, payload.selected_files)
+        target = resolve_scan_folder(payload.subfolder)
+        return {
+            "total_files": len(files),
+            "files": [
+                {"path": str(p), "relative_path": str(p.relative_to(target)).replace("\\", "/")}
+                for p in files[:2000]
+            ],
+        }
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

@@ -24,7 +24,7 @@ class SearchCancelledError(Exception):
 
 
 def search_logs(payload: SearchRequest) -> SearchResponse:
-    paths = scan_log_files(payload.subfolder, payload.include_extensions)
+    paths = scan_log_files(payload.subfolder, payload.include_extensions, payload.selected_files)
     search_id = payload.search_id or str(uuid4())
     start_progress(search_id, len(paths))
     matcher = build_line_matcher(payload.filters)

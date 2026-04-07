@@ -44,7 +44,11 @@ def resolve_scan_folder(subfolder: str) -> Path:
     return candidate
 
 
-def scan_log_files(subfolder: str, include_extensions: list[str]) -> list[Path]:
+def scan_log_files(
+    subfolder: str,
+    include_extensions: list[str],
+    selected_files: list[str] | None = None,
+) -> list[Path]:
     target = resolve_scan_folder(subfolder)
     normalized_ext = _normalize_extensions(include_extensions)
     include_no_extension = "[none]" in normalized_ext
@@ -63,7 +67,31 @@ def scan_log_files(subfolder: str, include_extensions: list[str]) -> list[Path]:
             f"No matching log files found in mounted path '{scan_target}'. "
             "Check LOG_FOLDER mount and selected file extensions."
         )
-    return files
+    return select_files(files, subfolder, selected_files)
+
+
+def select_files(
+    files: list[Path],
+    subfolder: str,
+    selected_files: list[str] | None,
+) -> list[Path]:
+    if not selected_files:
+        return files
+
+    target = resolve_scan_folder(subfolder)
+    selected_set = {s.strip().replace("\\", "/").lstrip("./") for s in selected_files if s.strip()}
+    if not selected_set:
+        return files
+
+    chosen: list[Path] = []
+    for path in files:
+        relative = str(path.relative_to(target)).replace("\\", "/")
+        if relative in selected_set:
+            chosen.append(path)
+
+    if not chosen:
+        raise ValueError("Selected files were not found under the current folder and extension filters.")
+    return chosen
 
 
 def scan_root_metadata() -> dict[str, object]:

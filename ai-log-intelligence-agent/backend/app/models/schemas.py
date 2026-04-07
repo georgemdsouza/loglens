@@ -28,6 +28,7 @@ class SearchFilters(BaseModel):
 class ScanRequest(BaseModel):
     subfolder: str = ""
     include_extensions: list[str] = Field(default_factory=lambda: [".log", ".txt", ".gz"])
+    selected_files: list[str] = Field(default_factory=list)
 
 
 class SearchRequest(ScanRequest):
